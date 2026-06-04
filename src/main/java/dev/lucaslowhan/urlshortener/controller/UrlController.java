@@ -1,5 +1,6 @@
 package dev.lucaslowhan.urlshortener.controller;
 
+import dev.lucaslowhan.urlshortener.domain.Url;
 import dev.lucaslowhan.urlshortener.dto.request.CreateUrlRequest;
 import dev.lucaslowhan.urlshortener.service.UrlService;
 import org.springframework.http.HttpHeaders;
@@ -22,18 +23,32 @@ public class UrlController {
         this.urlService = urlService;
     }
 
+    /**
+     * Cria uma URL encurtada.
+     * POST /api/urls
+     *
+     * @param request corpo da requisição contendo a URL original
+     * @return 201 Created com o código curto gerado
+     */
     @PostMapping("/api/urls")
     public ResponseEntity<String> createShortUrl(@RequestBody CreateUrlRequest request){
         String shortCode = urlService.create(request.getOriginalUrl());
         return ResponseEntity.status(HttpStatus.CREATED).body(shortCode);
     }
 
+    /**
+     * Redireciona um código curto para a URL original.
+     * GET /{shortCode}
+     *
+     * @param shortCode código de 8 caracteres
+     * @return 302 Found com header Location, ou 404 se não encontrado
+     */
     @GetMapping("/{shortCode}")
     public ResponseEntity<Void> getOriginalUrl(@PathVariable String shortCode){
-        Optional<String> result = urlService.getOriginalUrl(shortCode);
+        Optional<Url> result = urlService.getOriginalUrl(shortCode);
         if(result.isPresent()) {
             HttpHeaders headers = new HttpHeaders();
-            headers.setLocation(URI.create(result.get()));
+            headers.setLocation(URI.create(result.get().getOriginalUrl()));
             return new ResponseEntity<>(headers, HttpStatus.FOUND);
         }else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
