@@ -1,8 +1,11 @@
 package dev.lucaslowhan.urlshortener.controller;
 
 import dev.lucaslowhan.urlshortener.domain.Url;
+import dev.lucaslowhan.urlshortener.domain.UrlAccessEvent;
 import dev.lucaslowhan.urlshortener.dto.request.CreateUrlRequest;
+import dev.lucaslowhan.urlshortener.service.UrlAccessProducer;
 import dev.lucaslowhan.urlshortener.service.UrlService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,14 +16,17 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @RestController
 public class UrlController {
     private final UrlService urlService;
+    private final UrlAccessProducer urlAccessProducer;
 
-    public UrlController(UrlService urlService) {
+    public UrlController(UrlService urlService, UrlAccessProducer urlAccessProducer) {
         this.urlService = urlService;
+        this.urlAccessProducer = urlAccessProducer;
     }
 
     /**
@@ -44,11 +50,16 @@ public class UrlController {
      * @return 302 Found com header Location, ou 404 se não encontrado
      */
     @GetMapping("/{shortCode}")
-    public ResponseEntity<Void> getOriginalUrl(@PathVariable String shortCode){
+    public ResponseEntity<Void> getOriginalUrl(@PathVariable String shortCode, HttpServletRequest request){
         Optional<Url> result = urlService.getOriginalUrl(shortCode);
         if(result.isPresent()) {
             HttpHeaders headers = new HttpHeaders();
             headers.setLocation(URI.create(result.get().getOriginalUrl()));
+            urlAccessProducer.publish(UrlAccessEvent.builder()
+                    .shortCode(shortCode)
+                    .ipAddress(request.getRemoteAddr())
+                    .userAgent(request.getHeader("User-Agent"))
+                    .build());
             return new ResponseEntity<>(headers, HttpStatus.FOUND);
         }else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
